@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Embedded Project Packer</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{background:#f1f5f9;color:#1e293b}</style>
+</head>
+<body class="min-h-screen">
+<div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
+<header class="relative pr-24"><button id="lang" class="absolute top-0 right-0 border rounded-lg px-3 py-1 text-sm bg-white font-semibold" title="Sprache / Language"><span id="lde">DE</span> / <span id="len" class="opacity-40">EN</span></button><h1 class="text-2xl font-bold">📦 Embedded Project Packer</h1>
+<p class="text-sm text-slate-500">Ein Projekt mit vielen Dateien → eine einzige Quelldatei. Läuft lokal im Browser.</p></header>
+
+<section class="grid md:grid-cols-2 gap-4">
+<div id="drop" class="bg-white rounded-xl border-2 border-dashed border-slate-300 p-5 text-center flex flex-col justify-center">
+<p class="font-semibold mb-1">Dateien oder Ordner hierher ziehen</p>
+<p class="text-sm text-slate-500 mb-3">Binärdateien und Ordner wie .git / node_modules werden übersprungen</p>
+<div class="flex justify-center gap-2">
+<button id="pick" class="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm">Dateien wählen</button>
+<button id="pickdir" class="px-4 py-2 rounded-lg bg-slate-600 text-white text-sm">Ordner wählen</button></div>
+<input id="file" type="file" multiple class="hidden"><input id="dir" type="file" webkitdirectory class="hidden">
+</div>
+<div class="bg-white rounded-xl border border-slate-200 p-5 space-y-2">
+<p class="font-semibold">Aus Zwischenablage einfügen</p>
+<input id="pname" placeholder="Dateiname, z. B. src/WLAN.h" class="w-full border rounded-lg px-3 py-2 text-sm">
+<textarea id="ptext" rows="4" placeholder="Code hier einfügen (Strg+V)…" class="w-full border rounded-lg px-3 py-2 text-sm font-mono"></textarea>
+<button id="padd" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">Zur Liste hinzufügen</button></div>
+</section>
+
+<div id="note" class="hidden rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm"></div>
+<div id="warn" class="hidden rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm">⚠ Keine Hauptdatei erkannt. Mit ☆ kannst du selbst eine festlegen.</div>
+
+<section class="bg-white rounded-xl border border-slate-200 p-5">
+<div class="flex justify-between mb-3"><h2 class="font-semibold">Dateien in Merge-Reihenfolge <span id="count" class="text-slate-400 font-normal"></span></h2>
+<button id="clear" class="text-sm text-red-600">Alle entfernen</button></div>
+<ul id="list" class="divide-y divide-slate-100 text-sm"></ul>
+<p id="empty" class="text-sm text-slate-400 py-4 text-center">Noch keine Dateien hinzugefügt.</p>
+</section>
+
+<section class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+<div class="grid sm:grid-cols-2 gap-4 text-sm">
+<label>Projektname<input id="proj" class="mt-1 w-full border rounded-lg px-3 py-1.5"></label>
+<div><label for="ver" class="block">Version (optional)</label><div class="mt-1 flex items-center gap-3"><input id="ver" class="w-32 border rounded-lg px-3 py-1.5" placeholder="z. B. 2"><span class="text-sm text-slate-600 flex items-center gap-1 min-w-0"><span>Dateiname:</span> <code id="fnp" class="font-mono bg-slate-100 rounded px-1.5 py-0.5 break-all"></code></span></div></div>
+<label>Sortierung<select id="sort" class="mt-1 w-full border rounded-lg px-2 py-1.5">
+<option value="main">Hauptdatei zuerst, Rest alphabetisch</option><option value="alpha">Rein alphabetisch</option><option value="manual">Manuell (▲ ▼)</option></select></label>
+<label>Ausgabeformat<select id="fmt" class="mt-1 w-full border rounded-lg px-2 py-1.5"><option value="txt">.txt</option><option value="md">.md (mit Code-Blöcken)</option></select></label>
+<label>Trenner-Stil<select id="style" class="mt-1 w-full border rounded-lg px-2 py-1.5">
+<option value="auto">Automatisch je Dateityp</option><option value="c">immer /* … */</option><option value="line">immer // …</option><option value="hash">immer # …</option></select></label>
+</div>
+<div class="text-sm flex flex-wrap items-center gap-x-3 gap-y-1"><label class="flex items-center gap-2"><input id="uml" type="checkbox"> Umlaute ersetzen</label>
+<span>Ä wird zu</span><input id="uin" value="&amp;Auml;" class="border rounded-lg px-2 py-1 w-32 font-mono text-xs">
+<span id="uex" class="font-mono text-xs text-slate-500 whitespace-nowrap overflow-x-auto max-w-full"></span></div>
+<div class="flex flex-wrap items-center gap-5">
+<label class="flex items-center gap-2 text-sm" title="Leert Kommentare im Code, die Markierung (/* */ bzw. //) bleibt stehen"><input id="nocomm" type="checkbox"> Kommentare weglassen</label>
+<label class="flex items-center gap-2 text-sm"><input id="lnum" type="checkbox"> Zeilennummern</label>
+<label class="flex items-center gap-2 text-sm"><input id="dts" type="checkbox"> Dateiname mit Datum</label>
+<label class="flex items-center gap-2 text-sm"><input id="tree" type="checkbox"> Projektübersicht voranstellen</label>
+<button id="build" class="ml-auto px-6 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold disabled:opacity-40">Jetzt erstellen</button></div>
+</section>
+
+<section id="result" class="hidden bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+<div class="flex flex-wrap items-center gap-3"><h2 class="font-semibold">Ausgabe</h2><span id="stats" class="text-sm font-semibold text-emerald-700"></span>
+<div class="ml-auto flex gap-2"><button id="copy" class="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-sm">In Zwischenablage kopieren</button>
+<button id="dl" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm">Download</button></div></div>
+<textarea id="out" readonly wrap="off" placeholder="Hier erscheint das Ergebnis nach „Jetzt erstellen“." class="w-full h-72 max-h-96 overflow-auto resize-y border rounded-lg px-3 py-2 text-xs font-mono bg-slate-50"></textarea>
+</section>
+</div>
+
+<div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+<div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+<h3 class="font-bold text-lg mb-2">Bestehende Datei ersetzen?</h3>
+<p class="text-sm text-slate-600 mb-3"><b id="mname" class="font-mono break-all"></b> ist bereits in der Liste. Durch die neue Version ersetzen?</p>
+<label class="flex items-center gap-2 text-sm text-slate-500 mb-5"><input id="mall" type="checkbox"> Für alle weiteren Duplikate übernehmen</label>
+<div class="flex justify-end gap-2"><button id="mno" class="px-4 py-2 rounded-lg border text-sm">Behalten</button>
+<button id="myes" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">Ersetzen</button></div></div></div>
+
+<script>
+const $=id=>document.getElementById(id),files=[];let mainSel;
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const byteLen=s=>new TextEncoder().encode(s).length,norm=n=>n.trim().replace(/\\/g,'/').replace(/^\/+/,'');
+const extOf=n=>{const b=n.split('/').pop(),i=b.lastIndexOf('.');return i<0?'':b.slice(i+1).toLowerCase()};
+const IGN=['.git','node_modules','.pio','.vscode','.idea','build','dist','__pycache__','.venv','.gradle'],MAX=1048576;
+const AI_HEADER='/* Zusammenhängende Quelldatei aus mehreren Einzeldateien. Jede Datei (Sprungmarke: ## Dateiname) einzeln betrachten. Änderungen IMMER als einzelne Datei ausgeben. */';
+const PRIO=[/\.ino$/i,/(^|\/)main\.[a-z]+$/i,/(^|\/)(index|app|program)\.[a-z]+$/i];
+const rank=e=>({h:0,hpp:1,hh:2,c:3,cpp:4,cc:5}[e]??9),base=n=>{const e=extOf(n);return e?n.slice(0,-e.length-1):n};
+const cmp=(a,b)=>base(a.name).localeCompare(base(b.name),'de',{sensitivity:'base',numeric:true})||rank(extOf(a.name))-rank(extOf(b.name))||extOf(a.name).localeCompare(extOf(b.name));
+function mainName(){if(typeof mainSel==='string'&&files.some(f=>f.name===mainSel))return mainSel;if(mainSel===null)return null;
+for(const re of PRIO){const m=files.filter(f=>re.test(f.name)).sort(cmp)[0];if(m)return m.name}return null}
+function sorted(){const md=$('sort').value;if(md==='manual')return[...files];const all=[...files].sort(cmp);if(md==='alpha')return all;
+const m=mainName();return[...all.filter(f=>f.name===m),...all.filter(f=>f.name!==m)]}
+const projName=()=>$('proj').value.trim()||mainName()||'Projekt';
+
+function askReplace(name,b){if(b.choice!==null)return Promise.resolve(b.choice);
+return new Promise(res=>{$('mname').textContent=name;$('mall').checked=false;$('modal').classList.remove('hidden');
+const done=v=>{if($('mall').checked)b.choice=v;$('modal').classList.add('hidden');res(v)};
+$('myes').onclick=()=>done(true);$('mno').onclick=()=>done(false)})}
+async function addFile(name,content,size,b){name=norm(name).split('/').pop();if(!name)return;
+const i=files.findIndex(f=>f.name.toLowerCase()===name.toLowerCase());
+if(i>=0){if(!(await askReplace(files[i].name,b)))return;files[i]={name,content,size,inc:files[i].inc,tok:estTok(content)}}else files.push({name,content,size,inc:true,tok:estTok(content)})}
+
+function note(t){$('note').textContent=t;$('note').classList.toggle('hidden',!t)}
+async function importItems(items){const b={choice:null},sk=[];
+for(const{path,file}of items){const p=norm(path);
+if(p.split('/').slice(0,-1).some(s=>IGN.includes(s))||p.split('/').pop()==='.DS_Store'){sk.push(p+' ('+t('ignorierter Ordner')+')');continue}
+if(file.size>MAX){sk.push(p+' (>1 MB)');continue}
+const t=await file.text();if(t.includes('\u0000')){sk.push(p+' ('+t('Binärdatei')+')');continue}
+await addFile(p,t,file.size,b)}
+note(sk.length?`${t('Übersprungen')} (${sk.length}): `+sk.slice(0,8).join(', ')+(sk.length>8?' …':''):'');render()}
+const fromFL=fl=>[...fl].map(f=>({path:f.webkitRelativePath||f.name,file:f}));
+async function walk(en){if(en.isFile)return[{path:en.fullPath,file:await new Promise((ok,no)=>en.file(ok,no))}];
+const rd=en.createReader(),out=[];for(;;){const b=await new Promise((ok,no)=>rd.readEntries(ok,no));if(!b.length)break;
+for(const e of b){if(e.isDirectory&&IGN.includes(e.name))continue;out.push(...await walk(e))}}return out}
+$('pick').onclick=()=>$('file').click();$('pickdir').onclick=()=>$('dir').click();
+$('file').onchange=async e=>{await importItems(fromFL(e.target.files));e.target.value=''};
+$('dir').onchange=async e=>{await importItems(fromFL(e.target.files));e.target.value=''};
+const drop=$('drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('border-blue-500','bg-blue-50')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('border-blue-500','bg-blue-50')}));
+drop.addEventListener('drop',async e=>{const en=[...(e.dataTransfer.items||[])].map(i=>i.webkitGetAsEntry&&i.webkitGetAsEntry()).filter(Boolean);
+if(!en.length)return importItems(fromFL(e.dataTransfer.files));const all=[];for(const x of en)all.push(...await walk(x));importItems(all)});
+$('padd').onclick=async()=>{const n=$('pname').value.trim(),t=$('ptext').value;
+if(!n){$('pname').focus();$('pname').classList.add('border-red-500');return}$('pname').classList.remove('border-red-500');
+if(!t){$('ptext').focus();return}await addFile(n,t,byteLen(t),{choice:null});$('pname').value='';$('ptext').value='';render()};
+
+function render(){const list=sorted(),m=mainName(),man=$('sort').value==='manual';
+$('list').innerHTML=list.map((f,i)=>`<li class="flex items-center gap-2 py-2 ${f.inc?'':'opacity-50'}"><input type="checkbox" data-act="inc" data-n="${esc(f.name)}" ${f.inc?'checked':''} title="In Ausgabe aufnehmen"><span class="w-7 text-slate-400 font-mono">${f.inc?String(list.slice(0,i+1).filter(x=>x.inc).length).padStart(2,'0'):'–'}</span>
+<button data-act="main" data-n="${esc(f.name)}" class="text-lg ${f.name===m?'text-amber-500':'text-slate-300'}" title="Hauptdatei festlegen / aufheben">${f.name===m?'★':'☆'}</button>
+<span class="font-mono flex-1 truncate" title="${esc(f.name)}">${esc(f.name)}</span>${f.name===m?'<span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Hauptdatei</span>':''}
+<span class="text-slate-500 text-xs whitespace-nowrap">${f.size} Byte · ${t('ca.')} ${f.tok} Token</span>
+${man?`<button data-act="up" data-n="${esc(f.name)}" class="px-1">▲</button><button data-act="down" data-n="${esc(f.name)}" class="px-1">▼</button>`:''}
+<button data-act="rm" data-n="${esc(f.name)}" class="text-red-500 px-2">✕</button></li>`).join('');
+$('empty').classList.toggle('hidden',list.length>0);$('count').textContent=list.length?`(${list.length})`:'';
+$('warn').classList.toggle('hidden',!(list.length&&!m));$('build').disabled=!list.some(f=>f.inc);
+$('proj').placeholder=(lang==='en'?'automatic: ':'automatisch: ')+(m||(lang==='en'?'Project':'Projekt'));tr($('list'));showFn()}
+$('list').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;
+const n=b.dataset.n,i=files.findIndex(f=>f.name===n),a=b.dataset.act;
+if(a==='inc'&&i>=0)files[i].inc=b.checked;
+if(a==='rm'&&i>=0){files.splice(i,1);if(mainSel===n)mainSel=undefined}
+if(a==='main')mainSel=mainName()===n?null:n;
+if(a==='up'&&i>0)[files[i-1],files[i]]=[files[i],files[i-1]];
+if(a==='down'&&i>=0&&i<files.length-1)[files[i+1],files[i]]=[files[i],files[i+1]];render()});
+$('clear').onclick=()=>{files.length=0;mainSel=undefined;note('');$('out').value='';lastStats=null;$('stats').textContent='';$('result').classList.add('hidden');render()};
+$('sort').onchange=render;
+
+function estTok(s){let t=0;const x=s.match(/\p{L}+|\d+|\n|[^\s\p{L}\d]+/gu)||[];
+for(const w of x){if(/^\p{L}/u.test(w)){for(const p of w.match(/\p{Lu}?\p{Ll}+|\p{Lu}+(?!\p{Ll})|\p{L}/gu)||[])t+=p.length<=7?1:Math.ceil(p.length/4.5)}else if(/^\d/.test(w))t+=Math.ceil(w.length/3);else t+=w==='\n'?1:Math.ceil(w.length/2)}return t}
+function umRules(){const v=$('uin').value,hex=/&#x([0-9a-f]+);/i,dec=/&#(\d+);/;
+if(!hex.test(v)&&!dec.test(v)&&!v.includes('A'))return null;
+return[['Ä',196,'A'],['ä',228,'a'],['Ö',214,'O'],['ö',246,'o'],['Ü',220,'U'],['ü',252,'u'],['ß',223,'']].map(([c,k,b])=>{let r;
+if(hex.test(v))r=v.replace(hex,()=>'&#x'+k.toString(16).toUpperCase()+';');
+else if(dec.test(v))r=v.replace(dec,()=>'&#'+k+';');
+else if(c==='ß')r=/&[A-Za-z]+;/.test(v)?'&szlig;':'ss';
+else{const s=c===c.toLowerCase()&&v===v.toUpperCase()?v.toLowerCase():v,i=s.search(/[Aa]/);r=s.slice(0,i)+b+s.slice(i+1)}
+return[c,r]})}
+function showUml(){const r=umRules();$('uex').textContent=r?r.map(([c,x])=>c+' -> '+x).join('   '):t('Ersatz muss ein A enthalten, z. B. &Auml;, Ae oder &#196;')}
+function applyUml(s){if(!$('uml').checked)return s;const r=umRules();if(!r)return s;for(const[c,x]of r)s=s.split(c).join(x);return s}
+function prep(f){let t=$('nocomm').checked?stripC(f.name,f.content):f.content;
+if($('lnum').checked){const L=t.split('\n');if(L[L.length-1]==='')L.pop();const w=String(L.length).length;t=L.map((x,j)=>String(j+1).padStart(w)+' | '+x).join('\n')}
+return t===''||t.endsWith('\n')?t:t+'\n'}
+function stripC(name,s){const e=extOf(name),has=l=>l.split(' ').includes(e);let m;
+if(has('ino c cpp cc h hpp hh java js jsx ts tsx cs go rs swift kt php dart scss'))m={b:['/*','*/'],l:'//',q:'"\'`'};
+else if(e==='css')m={b:['/*','*/'],q:'"\''};
+else if(has('py sh bash yml yaml toml rb r pl cmake'))m={l:'#',q:'"\'',t:e==='py'};
+else if(has('html htm xml svg vue'))m={b:['<!--','-->'],q:''};
+else if(has('lua sql'))m={l:'--',q:'"\''};
+else return s;
+let o='',i=0;const n=s.length,M='\u0001';
+while(i<n){const c=s[i];
+if(m.t&&(s.startsWith('"""',i)||s.startsWith("'''",i))){const k=s.indexOf(c.repeat(3),i+3),j=k<0?n:k+3;o+=s.slice(i,j);i=j;continue}
+if(m.q.includes(c)){let j=i+1;while(j<n&&s[j]!==c&&(c==='`'||s[j]!=='\n')){if(s[j]==='\\')j++;j++}j=Math.min(j+1,n);o+=s.slice(i,j);i=j;continue}
+if(m.b&&s.startsWith(m.b[0],i)){const k=s.indexOf(m.b[1],i+m.b[0].length);i=k<0?n:k+m.b[1].length;o+=m.b[0]+' '+m.b[1];continue}
+if(m.l&&s.startsWith(m.l,i)&&(m.l!=='#'||i===0||/\s/.test(s[i-1]))&&!(m.l==='#'&&i===0&&s[1]==='!')){o+=m.l;while(i<n&&s[i]!=='\n')i++;continue}
+o+=c;i++}
+return o}
+/* ---------- GUI-Sprache (nur Oberfläche, nie der Ausgabetext) ---------- */
+let lang='de',lastStats=null;
+const EN={'Ein Projekt mit vielen Dateien → eine einzige Quelldatei. Läuft lokal im Browser.':'One project with many files → a single source file. Runs locally in your browser.',
+'Dateien oder Ordner hierher ziehen':'Drag files or folders here','Binärdateien und Ordner wie .git / node_modules werden übersprungen':'Binary files and folders like .git / node_modules are skipped',
+'Dateien wählen':'Choose files','Ordner wählen':'Choose folder','Aus Zwischenablage einfügen':'Paste from clipboard',
+'Dateiname, z. B. src/WLAN.h':'File name, e.g. src/WLAN.h','Code hier einfügen (Strg+V)…':'Paste code here (Ctrl+V)…','Zur Liste hinzufügen':'Add to list',
+'⚠ Keine Hauptdatei erkannt. Mit ☆ kannst du selbst eine festlegen.':'⚠ No main file detected. Use ☆ to set one yourself.',
+'Alle entfernen':'Remove all','Dateien in Merge-Reihenfolge':'Files in merge order','Noch keine Dateien hinzugefügt.':'No files added yet.',
+'Projektname':'Project name','Sortierung':'Sorting','Hauptdatei zuerst, Rest alphabetisch':'Main file first, rest alphabetical','Rein alphabetisch':'Alphabetical only','Manuell (▲ ▼)':'Manual (▲ ▼)',
+'Ausgabeformat':'Output format','.md (mit Code-Blöcken)':'.md (with code blocks)','Trenner-Stil':'Separator style','Automatisch je Dateityp':'Automatic per file type',
+'Kommentare weglassen':'Omit comments','Leert Kommentare im Code, die Markierung (/* */ bzw. //) bleibt stehen':'Empties code comments; the marker (/* */ or //) stays in place',
+'Zeilennummern':'Line numbers','Dateiname mit Datum':'File name with date','Dateiname:':'File name:','z. B. 2':'e.g. 2','Umlaute ersetzen':'Replace umlauts','Ä wird zu':'Ä becomes','Ersatz muss ein A enthalten, z. B. &Auml;, Ae oder &#196;':'Replacement must contain an A, e.g. &Auml;, Ae or &#196;',
+'Projektübersicht voranstellen':'Prepend project overview','Jetzt erstellen':'Create now','Ausgabe':'Output','In Zwischenablage kopieren':'Copy to clipboard','Kopiert ✓':'Copied ✓','Hier erscheint das Ergebnis nach „Jetzt erstellen“.':'The result appears here after “Create now”.',
+'Bestehende Datei ersetzen?':'Replace existing file?','ist bereits in der Liste. Durch die neue Version ersetzen?':'is already in the list. Replace it with the new version?',
+'Für alle weiteren Duplikate übernehmen':'Apply to all further duplicates','Behalten':'Keep','Ersetzen':'Replace',
+'Hauptdatei':'Main file','Hauptdatei festlegen / aufheben':'Set / unset as main file','In Ausgabe aufnehmen':'Include in output','ca.':'approx.',
+'Übersprungen':'Skipped','ignorierter Ordner':'ignored folder','Binärdatei':'binary file'};
+const REV=Object.fromEntries(Object.entries(EN).map(([a,b])=>[b,a]));
+const t=s=>lang==='en'&&EN[s]||s;
+function showStats(){if(!lastStats)return;const s=lastStats,en=lang==='en',f=x=>x.toLocaleString(en?'en-US':'de-DE'),lo=f(Math.round(s.tok*.85)),hi=f(Math.round(s.tok*1.15));$('stats').textContent=en?`This file uses approx. ${f(s.tok)} tokens (range ${lo}–${hi}) · ${s.n} files · ${s.b} bytes`:`Diese Datei verbraucht ca. ${f(s.tok)} Token (Spanne ${lo}–${hi}) · ${s.n} Dateien · ${s.b} Byte`}
+function tr(root){const en=lang==='en',w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),ns=[];while(w.nextNode())ns.push(w.currentNode);
+for(const n of ns){const p=n.parentElement;if(!p||/^(SCRIPT|STYLE|TEXTAREA)$/.test(p.tagName))continue;
+if(n.__de===undefined){const v=n.nodeValue,r=REV[v.trim()];n.__de=r?v.replace(v.trim(),()=>r):v}
+const k=n.__de.trim();if(EN[k])n.nodeValue=en?n.__de.replace(k,()=>EN[k]):n.__de}
+root.querySelectorAll('[placeholder],[title]').forEach(el=>{if(el.id==='proj'||el.id==='lang')return;
+for(const a of['placeholder','title']){const v=el.getAttribute(a);if(v===null)continue;const kk='de'+a;
+if(el.dataset[kk]===undefined)el.dataset[kk]=REV[v]||v;const o=el.dataset[kk];if(EN[o])el.setAttribute(a,en?EN[o]:o)}})}
+$('lang').onclick=()=>{lang=lang==='de'?'en':'de';document.documentElement.lang=lang;
+$('lde').style.opacity=lang==='en'?.4:1;$('len').style.opacity=lang==='en'?1:.4;tr(document.body);render();showStats();showUml()};
+function fileName(){const c=s=>s.replace(/[^\w.-]+/g,'_').replace(/^_+|_+$/g,'');
+const p=c(projName().replace(/\.[^.]+$/,''))||'Projekt',v=c($('ver').value.trim()),d=$('dts').checked?new Date().toLocaleDateString('sv-SE'):'';
+return[p,v,d,'kompakt'].filter(Boolean).join('_')+'.'+$('fmt').value}
+function showFn(){$('fnp').textContent=fileName()}
+const SB={};
+'ino c cpp cc h hpp hh java js jsx ts tsx css scss cs go rs swift kt php dart'.split(' ').forEach(e=>SB[e]='c');
+'py sh bash yml yaml toml ini cfg conf rb pl cmake r env gitignore'.split(' ').forEach(e=>SB[e]='hash');
+'html htm xml svg md vue'.split(' ').forEach(e=>SB[e]='html');'lua sql hs'.split(' ').forEach(e=>SB[e]='dash');
+const styleFor=n=>{const s=$('style').value;return s!=='auto'?s:(SB[extOf(n)]||'c')};
+function wrap(l,st){if(st==='line')return l.map(x=>'// '+x).join('\n');if(st==='hash')return l.map(x=>'# '+x).join('\n');
+if(st==='dash')return l.map(x=>'-- '+x).join('\n');if(st==='html')return`<!-- ${l.join('\n     ')} -->`;
+return l.length===1?`/* ${l[0]} */`:`/*\n${l.map(x=>' * '+x).join('\n')}\n */`}
+const LANG={ino:'cpp',h:'cpp',hpp:'cpp',cc:'cpp',cpp:'cpp',c:'c',py:'python',js:'javascript',jsx:'jsx',ts:'typescript',tsx:'tsx',html:'html',htm:'html',css:'css',json:'json',md:'markdown',yml:'yaml',yaml:'yaml',sh:'bash',cs:'csharp',rs:'rust',go:'go',java:'java',kt:'kotlin',php:'php',ini:'ini',toml:'toml',xml:'xml',sql:'sql',lua:'lua'};
+
+$('build').onclick=()=>{const list=sorted().filter(f=>f.inc),proj=projName(),noC=$('nocomm').checked,md=$('fmt').value==='md',parts=[AI_HEADER+'\n'];
+if($('tree').checked){const l=[`Projekt: ${proj}`,`${list.length} Dateien:`,...list.map((f,i)=>`${String(i+1).padStart(2,'0')}  ${f.name}  (${f.size} Byte)`)];
+parts.push(md?`# ${proj}\n\n`+l.slice(1).map(x=>'- '+x).join('\n')+'\n':wrap(l,styleFor(list[0].name))+'\n')}
+list.forEach((f,i)=>{const nr=String(i+1).padStart(2,'0'),st=styleFor(f.name),body=prep(f);
+let c=wrap([`DateiNr ${nr} || ${f.name} || ${f.size} Byte || Teil des Projektes: ${proj}`],st)+'\n'+body+wrap([`DateiNr ${nr} || ${f.name} ENDE`],st)+'\n';
+if(md){const run=Math.max(2,...(f.content.match(/`+/g)||[]).map(s=>s.length)),fe='`'.repeat(run+1);c=`## ${f.name}\n\n${fe}${LANG[extOf(f.name)]||''}\n${c}${fe}\n`}
+else c=`## ${f.name}\n${c}`;parts.push(c)});
+const out=applyUml(parts.join('\n'));$('out').value=out;
+lastStats={tok:estTok(out),n:list.length,b:byteLen(out)};showStats();
+$('result').classList.remove('hidden');$('result').scrollIntoView({behavior:'smooth'})};
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('out').value)}catch{$('out').select();document.execCommand('copy')}
+$('copy').textContent=t('Kopiert ✓');setTimeout(()=>$('copy').textContent=t('In Zwischenablage kopieren'),1500)};
+$('dl').onclick=async()=>{let d=null;try{d=window.claude&&await claude.use('downloads')}catch(e){}
+if(d){try{await d.save({filename:fileName(),data:$('out').value})}catch(e){}return}
+const b=projName().replace(/\.[^.]+$/,'').replace(/[^\w.-]+/g,'_')||'Projekt',a=document.createElement('a');
+a.href=URL.createObjectURL(new Blob([$('out').value],{type:'text/plain;charset=utf-8'}));a.download=fileName();a.click();URL.revokeObjectURL(a.href)};
+render();$('uin').oninput=showUml;showUml();$('proj').oninput=$('ver').oninput=showFn;$('dts').onchange=$('fmt').onchange=showFn;showFn();
+</script>
+</body>
+</html>
